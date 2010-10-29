@@ -53,14 +53,43 @@
      :servlet-response response
      :servlet-context  (.getServletContext servlet)}))
 
+; depending on type of header we're trying to set on the response, choose different setter functions
+(defmulti  ^{:private true} set-header #(class %3))
+(defmethod set-header Number
+	[^HttpServletResponse response  ^String name  ^Number val]
+	(.setIntHeader response name (int val)))
+(defmethod set-header java.util.Date
+	[^HttpServletResponse response  ^String name  ^java.util.Date val]
+	(.setDateHeader response name (.getTime val)))
+(defmethod set-header java.util.Calendar
+	[^HttpServletResponse response  ^String name  ^java.util.Calendar val]
+	(.setDateHeader response name (.getTimeInMillis val)))
+(defmethod set-header String
+	[^HttpServletResponse response  ^String name  ^String val]
+	(.setHeader response name val))
+
+(defmulti  ^{:private true} add-header #(class %3))
+(defmethod add-header Number
+	[^HttpServletResponse response  ^String name  ^Number val]
+	(.addIntHeader response name (int val)))
+(defmethod add-header java.util.Date
+	[^HttpServletResponse response  ^String name  ^java.util.Date val]
+	(.addDateHeader response name (.getTime val)))
+(defmethod add-header java.util.Calendar
+	[^HttpServletResponse response  ^String name  ^java.util.Calendar val]
+	(.addDateHeader response name (.getTimeInMillis val)))
+(defmethod add-header String
+	[^HttpServletResponse response  ^String name  ^String val]
+	(.addHeader response name val))
+
 (defn- set-headers
   "Update a HttpServletResponse with a map of headers."
   [^HttpServletResponse response, headers]
   (doseq [[key val-or-vals] headers]
-    (if (string? val-or-vals)
-      (.setHeader response key val-or-vals)
+    (if (seq? val-or-vals)
       (doseq [val val-or-vals]
-        (.addHeader response key val))))
+        (add-header response key val))
+      (set-header response key val-or-vals)))
   ; Some headers must be set through specific methods
   (when-let [content-type (get headers "Content-Type")]
     (.setContentType response content-type)))
